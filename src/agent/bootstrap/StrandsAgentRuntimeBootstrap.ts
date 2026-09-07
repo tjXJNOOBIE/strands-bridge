@@ -5,13 +5,14 @@ import type {
 } from '@strands-agents/sdk'
 
 import type { StrandsAgentRuntimeConfig } from '../config/StrandsAgentRuntimeConfig.js'
+import type { IStrandsAgentRuntimeBootstrap } from './IStrandsAgentRuntimeBootstrap.js'
 import { StrandsAgentRuntimeConfigError } from '../error/StrandsAgentRuntimeConfigError.js'
 import type { IStrandsAgentRuntime } from '../runtime/IStrandsAgentRuntime.js'
 import { StrandsAgentRuntime } from '../runtime/StrandsAgentRuntime.js'
 import type { IStrandsRuntimePlatform } from '../../strands/platform/IStrandsRuntimePlatform.js'
 import { StrandsRuntimePlatform } from '../../strands/platform/StrandsRuntimePlatform.js'
 
-export class StrandsAgentRuntimeBootstrap {
+export class StrandsAgentRuntimeBootstrap implements IStrandsAgentRuntimeBootstrap {
   private readonly strandsRuntimePlatform: IStrandsRuntimePlatform
 
   public constructor(
