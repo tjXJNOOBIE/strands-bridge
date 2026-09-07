@@ -1,0 +1,39 @@
+{
+  "name": "@tjxjnoobie/custom-strands-bridge",
+  "version": "0.1.0",
+  "description": "Shared Strands Agents runtime bridge for Tavall agent products.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsc -p tsconfig.test.json && node --test \".test-dist/test/**/*.test.js\"",
+    "check": "npm run typecheck && npm run test && npm run build"
+  },
+  "dependencies": {
+    "@strands-agents/sdk": "1.16.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "typescript": "^5.8.3"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  }
+}
