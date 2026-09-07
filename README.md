@@ -104,11 +104,29 @@ The returned tool can be supplied to another agent's native `AgentConfig.tools`.
 
 ## Development
 
+Normal bridge checks:
+
 ```bash
 npm install
 npm run check
 ```
 
-The package pins `@strands-agents/sdk` so all consuming agents share one validated SDK baseline. Dependency upgrades should be deliberate bridge changes with matching validation.
+Promotion checks against the physically installed Strands SDK:
+
+```bash
+npm run check:real
+```
+
+`check:real` first verifies that `node_modules/@strands-agents/sdk` is the exact version pinned by this package. A contract shim, mismatched SDK, or missing install fails before the MCP integration is allowed to run. It then starts a disposable local MCP server, initializes a native Strands agent through that server, verifies MCP initialization/tool discovery, and closes the runtime.
+
+An authorized model invocation is a separate credential-gated check:
+
+```bash
+STRANDS_BRIDGE_MODEL_ID=global.anthropic.claude-sonnet-4-6 npm run test:integ:model
+```
+
+The model smoke intentionally fails when `STRANDS_BRIDGE_MODEL_ID` is absent. Provider credentials and region configuration remain environment-owned and are never committed.
+
+The package pins `@strands-agents/sdk` so all consuming agents share one validated SDK baseline. Dependency upgrades should be deliberate bridge changes with matching validation. `prepack` rebuilds `dist` before publication so an npm release cannot quietly contain stale compiled output.
 
 See [`docs/strands-bridge/STRANDS_BRIDGE_FINAL_DRAFT.md`](docs/strands-bridge/STRANDS_BRIDGE_FINAL_DRAFT.md) for the current design contract.

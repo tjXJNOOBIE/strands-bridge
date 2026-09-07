@@ -218,6 +218,34 @@ Before the bridge foundation is promoted from draft:
 
 Contract-shim tests may be used when a restricted execution environment cannot reach npm, but they are not a substitute for the real installed-SDK checks above and must be reported as such.
 
+### Validation Commands
+
+Bridge-owned delegate tests, type checking, and build:
+
+```text
+npm run check
+```
+
+Real installed-SDK promotion validation:
+
+```text
+npm run check:real
+```
+
+`check:real` performs the normal bridge checks, verifies that the installed `@strands-agents/sdk` version exactly matches the pinned dependency, builds the package, starts a disposable newline-delimited stdio MCP server, initializes a native Strands Agent through the bridge, verifies MCP `initialize`, `notifications/initialized`, and `tools/list` traffic, and then closes the runtime.
+
+The real-SDK verifier must fail when a contract shim or mismatched SDK is installed. A failed verifier is a blocked promotion gate, not a test failure to suppress.
+
+Authorized Bedrock/model validation is separate because credentials are environment-owned:
+
+```text
+STRANDS_BRIDGE_MODEL_ID=<authorized-bedrock-model-id> npm run test:integ:model
+```
+
+That command requires an explicit model ID, performs a real `Agent.invoke()` through the bridge, requires a non-empty native `AgentResult`, and closes the runtime. It must not silently skip when credentials or model configuration are absent.
+
+`npm pack --dry-run --ignore-scripts --json` remains the package-content inspection command. `prepack` runs the production build before an actual package publication.
+
 ## Final Rules Summary
 
 - Strands owns the agent loop and its native features.
