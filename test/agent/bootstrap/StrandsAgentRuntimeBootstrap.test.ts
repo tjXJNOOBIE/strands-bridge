@@ -78,6 +78,13 @@ test('composesConfiguredToolsWithLoadedMcpClientsAndInitializesAgent', async () 
       name: 'Recovery Agent',
       tools: [configuredTool],
       printer: false,
+      appState: {
+        workflow: 'recovery',
+      },
+      backgroundTasks: true,
+      checkpointing: true,
+      contextManager: false,
+      toolExecutor: 'sequential',
       traceAttributes: {
         product: 'recovery-agent',
       },
@@ -95,8 +102,23 @@ test('composesConfiguredToolsWithLoadedMcpClientsAndInitializesAgent', async () 
   assert.equal(fakeAgent.initializeCalls, 1)
   assert.equal(strandsRuntimePlatform.loadMcpClientCalls, 1)
   assert.equal(strandsRuntimePlatform.loadedMcpServers, mcpServers)
+  assert.deepEqual(strandsRuntimePlatform.loadedMcpDefaults, {
+    applicationName: 'recovery-agent',
+    applicationVersion: '0.1.0',
+  })
   assert.equal(strandsRuntimePlatform.createdAgentConfig?.id, 'recovery-agent')
   assert.equal(strandsRuntimePlatform.createdAgentConfig?.name, 'Recovery Agent')
+  assert.equal(strandsRuntimePlatform.createdAgentConfig?.printer, false)
+  assert.deepEqual(strandsRuntimePlatform.createdAgentConfig?.appState, {
+    workflow: 'recovery',
+  })
+  assert.equal(strandsRuntimePlatform.createdAgentConfig?.backgroundTasks, true)
+  assert.equal(strandsRuntimePlatform.createdAgentConfig?.checkpointing, true)
+  assert.equal(strandsRuntimePlatform.createdAgentConfig?.contextManager, false)
+  assert.equal(strandsRuntimePlatform.createdAgentConfig?.toolExecutor, 'sequential')
+  assert.deepEqual(strandsRuntimePlatform.createdAgentConfig?.traceAttributes, {
+    product: 'recovery-agent',
+  })
 
   const createdTools = strandsRuntimePlatform.createdAgentConfig?.tools
   assert.ok(createdTools)
