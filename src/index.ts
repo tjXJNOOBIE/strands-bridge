@@ -1,3 +1,4 @@
+export type { IStrandsAgentRuntimeBootstrap } from './agent/bootstrap/IStrandsAgentRuntimeBootstrap.js'
 export { StrandsAgentRuntimeBootstrap } from './agent/bootstrap/StrandsAgentRuntimeBootstrap.js'
 export type {
   StrandsAgentRuntimeConfig,
