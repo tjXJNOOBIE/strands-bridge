@@ -1,8 +1,8 @@
-# Custom Strands Bridge
+# Strands Bridge
 
-Shared TypeScript runtime integration for Tavall agent products built with the [Strands Agents SDK](https://strandsagents.com/).
+Thin shared TypeScript integration for Tavall agent products built with the [Strands Agents SDK](https://strandsagents.com/).
 
-The package exists so product repositories can stay focused on what their agent does while sharing one tested boundary for Strands startup, MCP composition, invocation, streaming, cancellation, agent-as-tool composition, and cleanup.
+Strands is the agent framework and owns the model/tool loop. This package exists only so product repositories do not copy the same Strands startup, MCP composition, invocation, streaming, cancellation, agent-as-tool composition, and cleanup wiring.
 
 ## Installation
 
@@ -11,7 +11,7 @@ Consumer agent packages depend on the bridge transitively. End users install or 
 For direct library development:
 
 ```bash
-npm install @tjxjnoobie/custom-strands-bridge
+npm install @tjxjnoobie/strands-bridge
 ```
 
 Node.js 22 or newer is required.
@@ -20,7 +20,7 @@ Node.js 22 or newer is required.
 
 ```text
 agent product
-    -> @tjxjnoobie/custom-strands-bridge
+    -> @tjxjnoobie/strands-bridge
         -> @strands-agents/sdk
             -> model provider
             -> native/local tools
@@ -30,12 +30,12 @@ agent product
 
 Strands runs in the local Node.js process. Amazon Bedrock is the SDK default model provider, while the native `AgentConfig` accepted by the bridge preserves Strands' other providers and advanced features.
 
-The TypeScript bridge does not recreate Tavall Java infrastructure. `tavall-di` and other Tavall Java tools remain authoritative inside their Java runtimes and are consumed over MCP where appropriate.
+The bridge does not recreate Tavall Java infrastructure and does not implement a competing agent runtime, provider layer, or authentication system. `tavall-di` and other Tavall Java tools remain authoritative inside their Java runtimes and are consumed over MCP where appropriate.
 
 ## Example
 
 ```ts
-import { StrandsAgentRuntimeBootstrap } from '@tjxjnoobie/custom-strands-bridge'
+import { StrandsAgentRuntimeBootstrap } from '@tjxjnoobie/strands-bridge'
 
 const bootstrap = new StrandsAgentRuntimeBootstrap()
 
@@ -75,7 +75,7 @@ MCP environment interpolation, transport selection, OAuth client credentials, pr
 
 ## Native Strands features
 
-The `agent` field is a typed extension of Strands `AgentConfig` that requires a stable `id` and `name`. This means consumer products can use Strands features without waiting for this bridge to invent wrappers for them, including:
+The `agent` field is a typed extension of Strands `AgentConfig` that requires a stable `id` and `name`. Consumer products can therefore use native Strands features without waiting for this bridge to invent wrappers for them, including:
 
 - model providers and model routers;
 - native and MCP tools;
@@ -91,7 +91,7 @@ The `agent` field is a typed extension of Strands `AgentConfig` that requires a 
 
 ## Multi-agent composition
 
-A runtime can expose its agent as a Strands tool without leaking the underlying `Agent` handle:
+A runtime can expose its native Strands agent as a Strands tool without leaking the underlying mutable `Agent` handle:
 
 ```ts
 const specialistTool = specialistRuntime.createAgentTool({
@@ -127,6 +127,6 @@ STRANDS_BRIDGE_MODEL_ID=global.anthropic.claude-sonnet-4-6 npm run test:integ:mo
 
 The model smoke intentionally fails when `STRANDS_BRIDGE_MODEL_ID` is absent. Provider credentials and region configuration remain environment-owned and are never committed.
 
-The package pins `@strands-agents/sdk` so all consuming agents share one validated SDK baseline. Dependency upgrades should be deliberate bridge changes with matching validation. `prepack` rebuilds `dist` before publication so an npm release cannot quietly contain stale compiled output.
+The package pins `@strands-agents/sdk` so all consuming agents share one validated SDK baseline. Dependency upgrades should be deliberate bridge changes with matching validation. `prepare` builds `dist` for Git-based npm consumers and `prepack` rebuilds `dist` before registry publication.
 
 See [`docs/strands-bridge/STRANDS_BRIDGE_FINAL_DRAFT.md`](docs/strands-bridge/STRANDS_BRIDGE_FINAL_DRAFT.md) for the current design contract.
