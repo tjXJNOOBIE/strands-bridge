@@ -2,16 +2,16 @@
 
 > **Status:** Working design  
 > **Authority:** Proposed bridge behavior still open to material design changes  
-> **Owns:** Shared Strands runtime integration used by Tavall agent products  
-> **Must not define:** Product-specific agent behavior, Tavall Java DI internals, product persistence, UI rules, or deployment policy
+> **Owns:** Thin shared Strands integration used by Tavall agent products  
+> **Must not define:** Product-specific agent behavior, Tavall Java DI internals, product persistence, UI rules, provider implementations, authentication systems, or deployment policy
 
 ## About
 
-`custom-strands-bridge` provides one reusable Node.js/TypeScript boundary between Tavall agent products and the Strands Agents SDK.
+`strands-bridge` provides one reusable Node.js/TypeScript integration boundary between Tavall agent products and the Strands Agents SDK.
 
-Its purpose is to keep the four Agents for Humans products from copying the same Strands bootstrap, MCP composition, lifecycle, and shutdown behavior while preserving direct access to native Strands capabilities.
+Its purpose is to keep the Agents for Humans products from copying the same Strands bootstrap, MCP composition, lifecycle, and shutdown wiring while preserving direct access to native Strands capabilities.
 
-The bridge is a library, not an agent product and not a second agent framework.
+Strands is the agent framework and owns the model/tool loop. The bridge is a thin library, not an agent product and not a second agent framework.
 
 ## Ownership Rules
 
@@ -22,20 +22,24 @@ The bridge owns:
 - composition of native Strands `AgentConfig` with declarative MCP servers;
 - Strands agent initialization;
 - cleanup after partial startup;
-- invocation and streaming through a lifecycle-owned runtime;
+- invocation and streaming through a lifecycle-owned handle;
 - cooperative cancellation;
 - agent-as-tool composition without exposing the underlying mutable `Agent` handle;
 - reverse-order MCP teardown and cleanup retry after a failed disconnect.
 
 The bridge does not own:
 
+- the agent model/tool loop;
 - model-provider implementations;
 - MCP transport/auth parsing already provided by Strands;
+- product or client authentication systems;
 - Tavall Java dependency injection;
 - Tavall cache, registry, database, event, scheduling, or concurrency implementations;
 - product prompts, workflows, permissions, policies, or user-facing messages;
 - consumer application persistence;
 - AgentCore deployment configuration.
+
+Prefer native Strands functionality directly whenever the bridge would only rename or mirror an SDK feature without adding shared lifecycle, validation, or packaging value.
 
 ## Tavall Infrastructure Boundary
 
@@ -49,7 +53,7 @@ The same rule applies to Tavall Cache, Registry, Database, Concurrency, EventBus
 Strands TypeScript agent
     -> MCP tool
         -> Tavall Java runtime
-            -> tavall-di-owned handler/service/repository/etc.
+            -> Tavall-owned application behavior
 ```
 
 ## Technical Structure
@@ -84,13 +88,13 @@ If initialization fails after MCP clients were created, bootstrap closes those c
 
 ### `StrandsAgentRuntime`
 
-Owns the live agent generation returned to a consumer. It invokes and streams through the native Strands agent, exposes cooperative cancellation, creates agent-as-tool views, and closes MCP resources in reverse order.
+Owns lifecycle around the native Strands agent returned to a consumer. It invokes and streams through the native Strands agent, exposes cooperative cancellation, creates agent-as-tool views, and closes MCP resources in reverse order.
 
-Once close begins, the runtime rejects new work. If a client disconnect fails, a later `close()` call retries only resources that still report non-disconnected state.
+It does not replace Strands' runtime semantics or model/tool loop. Once close begins, the lifecycle owner rejects new work. If a client disconnect fails, a later `close()` call retries only resources that still report non-disconnected state.
 
 ### `StrandsRuntimePlatform`
 
-A narrow external-platform substitution boundary over Strands construction and declarative MCP loading. It exists so bridge tests can replace the actual SDK/network boundary while exercising real bridge bootstrap and runtime behavior.
+A narrow external-platform substitution boundary over Strands construction and declarative MCP loading. It exists so bridge tests can replace the actual SDK/network boundary while exercising real bridge bootstrap and lifecycle behavior.
 
 It must not grow product logic or become a second framework API.
 
@@ -135,16 +139,16 @@ validate bridge identity
     -> compose native tools + MCP clients
     -> create native Strands Agent
     -> initialize Agent
-    -> publish StrandsAgentRuntime
+    -> publish lifecycle-owned Strands handle
 ```
 
-No runtime is published before initialization succeeds.
+No lifecycle handle is published before initialization succeeds.
 
 ### Invocation
 
 ```text
 consumer request
-    -> StrandsAgentRuntime
+    -> thin bridge lifecycle handle
     -> native Agent.invoke()/Agent.stream()
     -> Strands model/tool loop
     -> native AgentResult / stream events
@@ -155,17 +159,17 @@ The bridge returns native Strands results so traces, metrics, interrupts, struct
 ### Shutdown
 
 ```text
-mark runtime closed
+mark lifecycle handle closed
     -> cooperatively cancel active invocation
     -> disconnect MCP clients in reverse order
     -> report aggregate cleanup failure, if any
 ```
 
-A runtime marked closed never accepts a new invocation or creates a new agent tool view.
+A closed lifecycle handle never accepts a new invocation or creates a new agent tool view.
 
 ## Multi-Agent Rules
 
-`createAgentTool(...)` delegates to Strands' native agent-as-tool support. This enables specialist compositions without leaking the underlying `Agent` object and inviting callers to bypass runtime ownership.
+`createAgentTool(...)` delegates to Strands' native agent-as-tool support. This enables specialist compositions without leaking the underlying `Agent` object and inviting callers to bypass lifecycle ownership.
 
 Complex graph/swarm/workflow behavior remains in the agent product that owns the workflow unless multiple products later prove a genuinely reusable bridge-level policy.
 
@@ -188,7 +192,7 @@ Agent products depend on this package transitively:
 ```text
 npx <agent-package>
     -> installs agent package
-        -> installs @tjxjnoobie/custom-strands-bridge
+        -> installs @tjxjnoobie/strands-bridge
             -> installs @strands-agents/sdk
 ```
 
@@ -232,7 +236,7 @@ Real installed-SDK promotion validation:
 npm run check:real
 ```
 
-`check:real` performs the normal bridge checks, verifies that the installed `@strands-agents/sdk` version exactly matches the pinned dependency, builds the package, starts a disposable newline-delimited stdio MCP server, initializes a native Strands Agent through the bridge, verifies MCP `initialize`, `notifications/initialized`, and `tools/list` traffic, and then closes the runtime.
+`check:real` performs the normal bridge checks, verifies that the installed `@strands-agents/sdk` version exactly matches the pinned dependency, builds the package, starts a disposable newline-delimited stdio MCP server, initializes a native Strands Agent through the bridge, verifies MCP `initialize`, `notifications/initialized`, and `tools/list` traffic, and then closes the lifecycle handle.
 
 The real-SDK verifier must fail when a contract shim or mismatched SDK is installed. A failed verifier is a blocked promotion gate, not a test failure to suppress.
 
@@ -242,17 +246,17 @@ Authorized Bedrock/model validation is separate because credentials are environm
 STRANDS_BRIDGE_MODEL_ID=<authorized-bedrock-model-id> npm run test:integ:model
 ```
 
-That command requires an explicit model ID, performs a real `Agent.invoke()` through the bridge, requires a non-empty native `AgentResult`, and closes the runtime. It must not silently skip when credentials or model configuration are absent.
+That command requires an explicit model ID, performs a real `Agent.invoke()` through the bridge, requires a non-empty native `AgentResult`, and closes the lifecycle handle. It must not silently skip when credentials or model configuration are absent.
 
-`npm pack --dry-run --ignore-scripts --json` remains the package-content inspection command. `prepack` runs the production build before an actual package publication.
+`npm pack --dry-run --ignore-scripts --json` remains the package-content inspection command. `prepare` builds `dist` for Git-based npm consumers, and `prepack` runs the production build before an actual package publication.
 
 ## Final Rules Summary
 
-- Strands owns the agent loop and its native features.
-- The bridge owns reusable composition and lifecycle, not product behavior.
+- Strands owns the agent framework, model/tool loop, and native features.
+- The bridge owns reusable composition/lifecycle glue, not product behavior or a competing runtime.
 - Tavall Java tools stay in Java and are consumed over MCP rather than recreated.
 - Validation happens before external runtime mutation.
-- Partial startup never publishes a runtime and cleans already-created resources.
+- Partial startup never publishes a lifecycle handle and cleans already-created resources.
 - Shutdown is explicit, reverse ordered, retryable for failed disconnects, and honest about cleanup failure.
 - Native `AgentConfig` and `AgentResult` remain visible so the bridge does not become an unnecessary parallel SDK.
 - Agent packages install the bridge transitively so users keep a one-command install/run experience.
