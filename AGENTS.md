@@ -1,6 +1,6 @@
 # Repository instructions
 
-`custom-strands-bridge` is the shared TypeScript/Node integration boundary between Tavall agent products and the Strands Agents SDK.
+`strands-bridge` is the thin shared TypeScript/Node integration boundary between Tavall agent products and the Strands Agents SDK.
 
 ## Authoritative engineering guidance
 
@@ -37,7 +37,7 @@ The primary `CODE_ARCHITECTURE.md` wins if a detailed chapter conflicts with it.
 
 ## Bridge ownership
 
-The bridge owns reusable Strands integration behavior shared by multiple agents:
+The bridge owns only reusable Strands integration behavior shared by multiple agents:
 
 - typed runtime identity and configuration;
 - native Strands `AgentConfig` preservation;
@@ -46,7 +46,9 @@ The bridge owns reusable Strands integration behavior shared by multiple agents:
 - invocation, streaming, cooperative cancellation, agent-as-tool composition, and deterministic teardown;
 - npm package boundaries required for transitive installation by consumer agent packages.
 
-The bridge does not own product prompts, product-specific tools, user data, business rules, persistence, deployment policy, or an agent product's UI.
+Strands remains the actual agent framework and owns the model/tool loop, native tools, MCP behavior, provider behavior, sessions, memory, retries, structured output, tracing, and other SDK capabilities.
+
+The bridge does not own product prompts, product-specific tools, user data, business rules, persistence, deployment policy, provider implementations, authentication systems, or an agent product's UI.
 
 Prefer native Strands capability over a bridge wrapper when the bridge would add no policy, lifecycle, validation, or stable Tavall boundary.
 
