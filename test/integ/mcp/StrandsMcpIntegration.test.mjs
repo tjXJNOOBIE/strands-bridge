@@ -15,7 +15,7 @@ const disposableServerPath = path.join(
 
 test('initializesNativeAgentThroughDisposableMcpServerAndCleansUp', async () => {
   const temporaryDirectory = await mkdtemp(
-    path.join(tmpdir(), 'custom-strands-bridge-mcp-'),
+    path.join(tmpdir(), 'strands-bridge-mcp-'),
   )
   const logPath = path.join(temporaryDirectory, 'mcp-methods.log')
   const bootstrap = new StrandsAgentRuntimeBootstrap()
@@ -41,7 +41,7 @@ test('initializesNativeAgentThroughDisposableMcpServerAndCleansUp', async () => 
         },
       },
       mcpDefaults: {
-        applicationName: 'custom-strands-bridge-integration',
+        applicationName: 'strands-bridge-integration',
         applicationVersion: '0.1.0',
       },
     })
