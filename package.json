@@ -1,7 +1,7 @@
 {
-  "name": "@tjxjnoobie/custom-strands-bridge",
+  "name": "@tjxjnoobie/strands-bridge",
   "version": "0.1.0",
-  "description": "Shared Strands Agents runtime bridge for Tavall agent products.",
+  "description": "Thin shared integration bridge for Strands Agents in Tavall agent products.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -45,11 +45,11 @@
   "sideEffects": false,
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/tjXJNOOBIE/custom-strands-bridge.git"
+    "url": "git+https://github.com/tjXJNOOBIE/strands-bridge.git"
   },
-  "homepage": "https://github.com/tjXJNOOBIE/custom-strands-bridge#readme",
+  "homepage": "https://github.com/tjXJNOOBIE/strands-bridge#readme",
   "bugs": {
-    "url": "https://github.com/tjXJNOOBIE/custom-strands-bridge/issues"
+    "url": "https://github.com/tjXJNOOBIE/strands-bridge/issues"
   },
   "keywords": [
     "strands-agents",
