@@ -24,6 +24,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "tsc -p tsconfig.test.json && node --test \".test-dist/test/**/*.test.js\"",
     "check": "npm run typecheck && npm run test && npm run build",
+    "prepare": "npm run build",
     "prepack": "npm run build",
     "verify:real-strands": "node test/integ/strands/verify-real-strands-sdk.mjs",
     "test:integ:mcp": "npm run verify:real-strands && npm run build && node --test test/integ/mcp/*.test.mjs",
