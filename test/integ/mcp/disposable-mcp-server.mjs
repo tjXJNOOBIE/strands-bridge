@@ -61,7 +61,7 @@ for await (const line of input) {
           },
         },
         serverInfo: {
-          name: 'custom-strands-bridge-disposable-mcp',
+          name: 'strands-bridge-disposable-mcp',
           version: '1.0.0',
         },
       },
