@@ -29,6 +29,7 @@
     "verify:real-strands": "node test/integ/strands/verify-real-strands-sdk.mjs",
     "test:integ:mcp": "npm run verify:real-strands && npm run build && node --test test/integ/mcp/*.test.mjs",
     "test:integ:model": "npm run verify:real-strands && npm run build && node test/integ/model/authorized-model-smoke.mjs",
+    "test:integ:codex": "npm run verify:real-strands && npm run build && node test/integ/model/codex-cli-model-smoke.mjs",
     "check:real": "npm run check && npm run test:integ:mcp"
   },
   "dependencies": {

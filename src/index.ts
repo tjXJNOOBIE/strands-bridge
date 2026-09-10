@@ -1,5 +1,7 @@
 export type { IStrandsAgentRuntimeBootstrap } from './agent/bootstrap/IStrandsAgentRuntimeBootstrap.js'
 export { StrandsAgentRuntimeBootstrap } from './agent/bootstrap/StrandsAgentRuntimeBootstrap.js'
+export { CodexCliModel } from './model/CodexCliModel.js'
+export type { CodexCliModelConfig } from './model/CodexCliModel.js'
 export type {
   StrandsAgentRuntimeConfig,
   StrandsBridgeAgentConfig,

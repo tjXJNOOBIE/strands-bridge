@@ -32,6 +32,20 @@ Strands runs in the local Node.js process. Amazon Bedrock is the SDK default mod
 
 The bridge does not recreate Tavall Java infrastructure and does not implement a competing agent runtime, provider layer, or authentication system. `tavall-di` and other Tavall Java tools remain authoritative inside their Java runtimes and are consumed over MCP where appropriate.
 
+For local development where a user has a ChatGPT subscription but no model API key, set the native Strands model identifier to `codex-cli`. The bridge then uses the locally authenticated `codex` CLI as a read-only, ephemeral model subprocess and translates its bounded JSON response into native Strands model/tool events. The parent Strands runtime still owns every MCP client, tool call, permission, and side effect. This mode is intended for local or user-owned environments; it does not provide credentials for a hosted deployment.
+
+```bash
+STRANDS_BRIDGE_CODEX_MODEL=gpt-5.6-luna npm run test:integ:model
+```
+
+For the bridge-owned subscription smoke, use:
+
+```bash
+STRANDS_BRIDGE_USE_CODEX_SUBSCRIPTION=1 npm run test:integ:codex
+```
+
+The Codex CLI must already be logged in with `codex login`; no subscription token is read or stored by this package. If the CLI is unavailable or not logged in, the command fails and must not be described as a model-provider pass.
+
 ## Example
 
 ```ts
