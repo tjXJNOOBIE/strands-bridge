@@ -138,9 +138,10 @@ export class StrandsBridgeRuntimeService {
       if (sourceAgentId === targetAgentId) {
         throw new Error(`Strands runtime ${targetAgentId} cannot reference itself as an agent tool`)
       }
-      if (!toolNames.add(toolName)) {
+      if (toolNames.has(toolName)) {
         throw new Error(`Duplicate Strands agent tool name: ${toolName}`)
       }
+      toolNames.add(toolName)
 
       const sourceRuntime = this.requireRuntime(sourceAgentId)
       const options: AgentAsToolOptions = {
