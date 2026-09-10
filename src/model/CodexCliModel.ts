@@ -184,6 +184,8 @@ export class CodexCliModel extends Model<CodexCliModelConfig> {
       '--color',
       'never',
       '--json',
+      '-c',
+      `model_reasoning_effort=\"${this.reasoningEffort()}\"`,
       ...(model === undefined || model.trim().length === 0 ? [] : ['--model', model]),
       '-',
     ]
@@ -393,5 +395,16 @@ export class CodexCliModel extends Model<CodexCliModelConfig> {
       throw new Error(`${name} must be a positive integer.`)
     }
     return value
+  }
+
+  private reasoningEffort(): 'low' | 'medium' | 'high' | 'xhigh' {
+    const value = process.env['STRANDS_BRIDGE_CODEX_REASONING_EFFORT']?.trim().toLowerCase()
+    if (value === undefined || value.length === 0) return 'medium'
+    if (value === 'low' || value === 'medium' || value === 'high' || value === 'xhigh') {
+      return value
+    }
+    throw new Error(
+      'STRANDS_BRIDGE_CODEX_REASONING_EFFORT must be one of low, medium, high, or xhigh.',
+    )
   }
 }
