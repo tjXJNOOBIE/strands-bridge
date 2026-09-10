@@ -178,6 +178,7 @@ export class CodexCliModel extends Model<CodexCliModelConfig> {
       'exec',
       '--ephemeral',
       '--skip-git-repo-check',
+      '--ignore-user-config',
       '--sandbox',
       'read-only',
       '--color',
@@ -196,6 +197,7 @@ export class CodexCliModel extends Model<CodexCliModelConfig> {
         cwd: this.config.workingDirectory ?? process.cwd(),
         stdio: ['pipe', 'pipe', 'pipe'],
         shell: false,
+        detached: true,
         env: process.env,
       })
       const stdout: Buffer[] = []
@@ -210,14 +212,25 @@ export class CodexCliModel extends Model<CodexCliModelConfig> {
         cancelSignal?.removeEventListener('abort', onAbort)
         action()
       }
+      const terminate = (): void => {
+        if (child.pid === undefined) {
+          child.kill('SIGTERM')
+          return
+        }
+        try {
+          process.kill(-child.pid, 'SIGTERM')
+        } catch {
+          child.kill('SIGTERM')
+        }
+      }
       const onAbort = (): void => {
-        child.kill('SIGTERM')
+        terminate()
         finish(() => reject(new Error('Codex subscription model invocation was cancelled.')))
       }
 
       cancelSignal?.addEventListener('abort', onAbort, {once: true})
       timeout = setTimeout(() => {
-        child.kill('SIGTERM')
+        terminate()
         finish(() => reject(new Error(`Codex subscription model timed out after ${timeoutMs}ms.`)))
       }, timeoutMs)
 
