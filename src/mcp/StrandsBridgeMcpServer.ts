@@ -2,7 +2,10 @@ import { McpServer } from '@modelcontextprotocol/server'
 import * as z from 'zod/v4'
 
 import type { StrandsAgentRuntimeConfig } from '../agent/config/StrandsAgentRuntimeConfig.js'
-import { StrandsBridgeRuntimeService } from './StrandsBridgeRuntimeService.js'
+import {
+  StrandsBridgeRuntimeService,
+  type StrandsAgentToolReference,
+} from './StrandsBridgeRuntimeService.js'
 
 const runtimeConfigSchema = z.object({
   agent: z.object({
@@ -16,6 +19,12 @@ const runtimeConfigSchema = z.object({
   mcpDefaults: z.record(z.string(), z.unknown()).optional(),
 }).passthrough()
 
+const agentToolReferenceSchema = z.object({
+  agentId: z.string().trim().min(1),
+  name: z.string().trim().min(1),
+  description: z.string().trim().min(1).optional(),
+}).strict()
+
 const invokeInputSchema = z.object({
   agentId: z.string().min(1),
   input: z.string(),
@@ -23,6 +32,10 @@ const invokeInputSchema = z.object({
 
 function runtimeConfig(value: unknown): StrandsAgentRuntimeConfig {
   return value as StrandsAgentRuntimeConfig
+}
+
+function agentToolReferences(value: unknown): readonly StrandsAgentToolReference[] {
+  return value as readonly StrandsAgentToolReference[]
 }
 
 function errorResult(error: unknown) {
@@ -46,16 +59,21 @@ export function createStrandsBridgeMcpServer(
   server.registerTool(
     'strands_agent_create',
     {
-      description: 'Create a sessionful Strands runtime. Product behavior and tools remain Java-owned.',
-      inputSchema: z.object({ config: runtimeConfigSchema }),
+      description: 'Create a sessionful Strands runtime. Existing Strands sessions may be attached as native agent-as-tool capabilities while product policy remains Java-owned.',
+      inputSchema: z.object({
+        config: runtimeConfigSchema,
+        agentTools: z.array(agentToolReferenceSchema).optional(),
+      }),
     },
-    async ({ config }) => {
+    async ({ config, agentTools }) => {
       try {
         const safeConfig = runtimeConfig(config)
-        await runtimeService.createAgent(safeConfig)
+        const safeAgentTools = agentTools === undefined ? [] : agentToolReferences(agentTools)
+        await runtimeService.createAgent(safeConfig, safeAgentTools)
         const output = {
           agentId: safeConfig.agent.id,
           status: 'created',
+          agentToolCount: safeAgentTools.length,
         }
 
         return {
@@ -110,7 +128,7 @@ export function createStrandsBridgeMcpServer(
   server.registerTool(
     'strands_agent_close',
     {
-      description: 'Close an existing Strands runtime and its Strands-owned MCP clients.',
+      description: 'Close an existing Strands runtime and its Strands-owned MCP clients. Referenced specialist sessions must remain live until their dependent composed runtime is closed.',
       inputSchema: z.object({ agentId: z.string().min(1) }),
     },
     async ({ agentId }) => {
@@ -130,7 +148,7 @@ export function createStrandsBridgeMcpServer(
   server.registerTool(
     'strands_agent_invoke_once',
     {
-      description: 'Create, invoke, and close one Strands runtime for a Java AIAgentProvider execution.',
+      description: 'Create, invoke, and close one independent Strands runtime for a Java AIAgentProvider execution.',
       inputSchema: z.object({
         config: runtimeConfigSchema,
         input: z.string(),
