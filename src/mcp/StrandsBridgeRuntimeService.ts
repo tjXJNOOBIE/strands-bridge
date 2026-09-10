@@ -171,7 +171,7 @@ export class StrandsBridgeRuntimeService {
       ...runtimeConfig,
       agent: {
         ...runtimeConfig.agent,
-        tools: [runtimeConfig.agent.tools ?? [], tools],
+        tools: [runtimeConfig.agent.tools ?? [], [...tools]],
       },
     }
   }
