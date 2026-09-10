@@ -1,0 +1,61 @@
+{
+  "name": "@tjxjnoobie/strands-bridge",
+  "version": "0.1.0",
+  "description": "Thin shared integration bridge for Strands Agents in Tavall agent products.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsc -p tsconfig.test.json && node --test \".test-dist/test/**/*.test.js\"",
+    "check": "npm run typecheck && npm run test && npm run build",
+    "prepare": "npm run build",
+    "prepack": "npm run build",
+    "verify:real-strands": "node test/integ/strands/verify-real-strands-sdk.mjs",
+    "test:integ:mcp": "npm run verify:real-strands && npm run build && node --test test/integ/mcp/*.test.mjs",
+    "test:integ:model": "npm run verify:real-strands && npm run build && node test/integ/model/authorized-model-smoke.mjs",
+    "test:integ:codex": "npm run verify:real-strands && npm run build && node test/integ/model/codex-cli-model-smoke.mjs",
+    "check:real": "npm run check && npm run test:integ:mcp"
+  },
+  "dependencies": {
+    "@strands-agents/sdk": "1.16.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "typescript": "^5.8.3"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tjXJNOOBIE/strands-bridge.git"
+  },
+  "homepage": "https://github.com/tjXJNOOBIE/strands-bridge#readme",
+  "bugs": {
+    "url": "https://github.com/tjXJNOOBIE/strands-bridge/issues"
+  },
+  "keywords": [
+    "strands-agents",
+    "agents",
+    "mcp",
+    "tavall"
+  ]
+}
