@@ -210,7 +210,7 @@ export class CodexCliModel extends Model<CodexCliModelConfig> {
       ...(model === undefined || model.trim().length === 0 ? [] : ['--model', model]),
       '-',
     ]
-    const timeoutMs = this.config.timeoutMs ?? this.positiveEnvironment(
+    const timeoutMs = this.config.timeoutMs ?? this.nonnegativeEnvironment(
       'STRANDS_BRIDGE_CODEX_TIMEOUT_MS',
       DEFAULT_TIMEOUT_MS,
     )
@@ -257,10 +257,12 @@ export class CodexCliModel extends Model<CodexCliModelConfig> {
       }
 
       cancelSignal?.addEventListener('abort', onAbort, {once: true})
-      timeout = setTimeout(() => {
-        terminate()
-        finish(() => reject(new Error(`Codex subscription model timed out after ${timeoutMs}ms.`)))
-      }, timeoutMs)
+      if (timeoutMs > 0) {
+        timeout = setTimeout(() => {
+          terminate()
+          finish(() => reject(new Error(`Codex subscription model timed out after ${timeoutMs}ms.`)))
+        }, timeoutMs)
+      }
 
       child.stdout.on('data', (chunk: Buffer) => stdout.push(chunk))
       child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk))
@@ -421,6 +423,16 @@ export class CodexCliModel extends Model<CodexCliModelConfig> {
     const value = Number(raw)
     if (!Number.isSafeInteger(value) || value <= 0) {
       throw new Error(`${name} must be a positive integer.`)
+    }
+    return value
+  }
+
+  private nonnegativeEnvironment(name: string, fallback: number): number {
+    const raw = process.env[name]
+    if (raw === undefined || raw.trim().length === 0) return fallback
+    const value = Number(raw)
+    if (!Number.isSafeInteger(value) || value < 0) {
+      throw new Error(`${name} must be a non-negative integer; use 0 for unlimited.`)
     }
     return value
   }

@@ -46,6 +46,10 @@ STRANDS_BRIDGE_USE_CODEX_SUBSCRIPTION=1 npm run test:integ:codex
 
 The Codex CLI must already be logged in with `codex login`; no subscription token is read or stored by this package. If the CLI is unavailable or not logged in, the command fails and must not be described as a model-provider pass.
 
+Set `STRANDS_BRIDGE_CODEX_TIMEOUT_MS=0` to disable the child wall-clock timeout
+for a developer-owned local run. Cancellation still terminates the complete
+process group, and request-level policy remains the caller's responsibility.
+
 ## Example
 
 ```ts
