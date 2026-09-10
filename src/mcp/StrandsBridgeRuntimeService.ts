@@ -1,3 +1,5 @@
+import type { AgentAsToolOptions, AgentResult, Tool } from '@strands-agents/sdk'
+
 import type { IStrandsAgentRuntimeBootstrap } from '../agent/bootstrap/IStrandsAgentRuntimeBootstrap.js'
 import { StrandsAgentRuntimeBootstrap } from '../agent/bootstrap/StrandsAgentRuntimeBootstrap.js'
 import type { StrandsAgentRuntimeConfig } from '../agent/config/StrandsAgentRuntimeConfig.js'
@@ -8,6 +10,12 @@ export interface StrandsBridgeInvocationResult {
   readonly text: string
 }
 
+export interface StrandsAgentToolReference {
+  readonly agentId: string
+  readonly name: string
+  readonly description?: string
+}
+
 /**
  * Owns the process-local Strands runtime handles exposed through MCP.
  * Product state and product capabilities remain Java-owned.
@@ -15,6 +23,7 @@ export interface StrandsBridgeInvocationResult {
 export class StrandsBridgeRuntimeService {
   private readonly runtimeBootstrap: IStrandsAgentRuntimeBootstrap
   private readonly runtimes = new Map<string, IStrandsAgentRuntime>()
+  private readonly runtimeReferences = new Map<string, ReadonlySet<string>>()
 
   public constructor(
     runtimeBootstrap: IStrandsAgentRuntimeBootstrap = new StrandsAgentRuntimeBootstrap(),
@@ -22,15 +31,21 @@ export class StrandsBridgeRuntimeService {
     this.runtimeBootstrap = runtimeBootstrap
   }
 
-  public async createAgent(runtimeConfig: StrandsAgentRuntimeConfig): Promise<void> {
+  public async createAgent(
+    runtimeConfig: StrandsAgentRuntimeConfig,
+    agentTools: readonly StrandsAgentToolReference[] = [],
+  ): Promise<void> {
     const agentId = this.requireAgentId(runtimeConfig)
 
     if (this.runtimes.has(agentId)) {
       throw new Error(`Strands agent runtime already exists: ${agentId}`)
     }
 
-    const runtime = await this.runtimeBootstrap.createAgentRuntime(runtimeConfig)
+    const resolved = this.resolveAgentTools(agentId, agentTools)
+    const composedConfig = this.withAgentTools(runtimeConfig, resolved.tools)
+    const runtime = await this.runtimeBootstrap.createAgentRuntime(composedConfig)
     this.runtimes.set(agentId, runtime)
+    this.runtimeReferences.set(agentId, resolved.referencedAgentIds)
   }
 
   public async invokeAgent(
@@ -51,12 +66,20 @@ export class StrandsBridgeRuntimeService {
   }
 
   public async closeAgent(agentId: string): Promise<void> {
-    const runtime = this.requireRuntime(agentId)
+    const safeAgentId = this.requireText(agentId, 'agentId')
+    const runtime = this.requireRuntime(safeAgentId)
+    const dependents = this.liveDependentsOf(safeAgentId)
+    if (dependents.length > 0) {
+      throw new Error(
+        `Cannot close Strands agent runtime ${safeAgentId}; referenced by live runtime(s): ${dependents.join(', ')}`,
+      )
+    }
 
     try {
       await runtime.close()
     } finally {
-      this.runtimes.delete(agentId)
+      this.runtimes.delete(safeAgentId)
+      this.runtimeReferences.delete(safeAgentId)
     }
   }
 
@@ -89,6 +112,7 @@ export class StrandsBridgeRuntimeService {
         failures.push(error)
       } finally {
         this.runtimes.delete(agentId)
+        this.runtimeReferences.delete(agentId)
       }
     }
 
@@ -98,6 +122,68 @@ export class StrandsBridgeRuntimeService {
         'One or more Strands runtimes failed to close.',
       )
     }
+  }
+
+  private resolveAgentTools(
+    targetAgentId: string,
+    references: readonly StrandsAgentToolReference[],
+  ): { readonly tools: readonly Tool[]; readonly referencedAgentIds: ReadonlySet<string> } {
+    const tools: Tool[] = []
+    const referencedAgentIds = new Set<string>()
+    const toolNames = new Set<string>()
+
+    for (const [index, reference] of references.entries()) {
+      const sourceAgentId = this.requireText(reference.agentId, `agentTools[${index}].agentId`)
+      const toolName = this.requireText(reference.name, `agentTools[${index}].name`)
+      if (sourceAgentId === targetAgentId) {
+        throw new Error(`Strands runtime ${targetAgentId} cannot reference itself as an agent tool`)
+      }
+      if (!toolNames.add(toolName)) {
+        throw new Error(`Duplicate Strands agent tool name: ${toolName}`)
+      }
+
+      const sourceRuntime = this.requireRuntime(sourceAgentId)
+      const options: AgentAsToolOptions = {
+        name: toolName,
+        ...(reference.description === undefined
+          ? {}
+          : { description: this.requireText(reference.description, `agentTools[${index}].description`) }),
+      }
+      tools.push(sourceRuntime.createAgentTool(options))
+      referencedAgentIds.add(sourceAgentId)
+    }
+
+    return {
+      tools,
+      referencedAgentIds,
+    }
+  }
+
+  private withAgentTools(
+    runtimeConfig: StrandsAgentRuntimeConfig,
+    tools: readonly Tool[],
+  ): StrandsAgentRuntimeConfig {
+    if (tools.length === 0) {
+      return runtimeConfig
+    }
+
+    return {
+      ...runtimeConfig,
+      agent: {
+        ...runtimeConfig.agent,
+        tools: [runtimeConfig.agent.tools ?? [], tools],
+      },
+    }
+  }
+
+  private liveDependentsOf(agentId: string): string[] {
+    const dependents: string[] = []
+    for (const [candidateId, references] of this.runtimeReferences.entries()) {
+      if (this.runtimes.has(candidateId) && references.has(agentId)) {
+        dependents.push(candidateId)
+      }
+    }
+    return dependents.sort()
   }
 
   private requireRuntime(agentId: string): IStrandsAgentRuntime {
