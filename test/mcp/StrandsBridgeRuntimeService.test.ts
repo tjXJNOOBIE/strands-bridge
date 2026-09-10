@@ -1,28 +1,40 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import type { AgentResult } from '@strands-agents/sdk'
+import type { AgentAsToolOptions, AgentResult, Tool } from '@strands-agents/sdk'
 
 import type { IStrandsAgentRuntimeBootstrap } from '../../src/agent/bootstrap/IStrandsAgentRuntimeBootstrap.js'
 import type { StrandsAgentRuntimeConfig } from '../../src/agent/config/StrandsAgentRuntimeConfig.js'
 import type { IStrandsAgentRuntime } from '../../src/agent/runtime/IStrandsAgentRuntime.js'
 import { StrandsBridgeRuntimeService } from '../../src/mcp/StrandsBridgeRuntimeService.js'
 
-function runtimeReturning(text: string, closeCalls: { count: number }): IStrandsAgentRuntime {
+function runtimeReturning(
+  text: string,
+  closeCalls: { count: number },
+  agentToolCalls: AgentAsToolOptions[] = [],
+): IStrandsAgentRuntime {
   return {
     invokeAgent: async () => ({ toString: () => text }) as unknown as AgentResult,
     cancelInvocation: () => undefined,
+    createAgentTool: (options?: AgentAsToolOptions) => {
+      agentToolCalls.push(options ?? {})
+      return { name: options?.name ?? 'agent-tool' } as unknown as Tool
+    },
     close: async () => {
       closeCalls.count += 1
     },
   } as unknown as IStrandsAgentRuntime
 }
 
-function bootstrapReturning(runtimes: IStrandsAgentRuntime[]): IStrandsAgentRuntimeBootstrap {
+function bootstrapReturning(
+  runtimes: IStrandsAgentRuntime[],
+  createdConfigs: StrandsAgentRuntimeConfig[] = [],
+): IStrandsAgentRuntimeBootstrap {
   let index = 0
 
   return {
-    createAgentRuntime: async () => {
+    createAgentRuntime: async (runtimeConfig) => {
+      createdConfigs.push(runtimeConfig)
       const runtime = runtimes[index]
       index += 1
       if (runtime === undefined) {
@@ -93,4 +105,96 @@ test('duplicate sessionful agent ids are rejected instead of replacing live runt
   assert.equal(secondCloseCalls.count, 0)
   await service.closeAll()
   assert.equal(firstCloseCalls.count, 1)
+})
+
+test('composed runtime receives native agent tools from existing specialist sessions', async () => {
+  const candidateCloseCalls = { count: 0 }
+  const directorCloseCalls = { count: 0 }
+  const agentToolCalls: AgentAsToolOptions[] = []
+  const createdConfigs: StrandsAgentRuntimeConfig[] = []
+  const candidate = runtimeReturning('candidate', candidateCloseCalls, agentToolCalls)
+  const director = runtimeReturning('director', directorCloseCalls)
+  const service = new StrandsBridgeRuntimeService(
+    bootstrapReturning([candidate, director], createdConfigs),
+  )
+
+  await service.createAgent(config('candidate-a'))
+  await service.createAgent(config('director'), [
+    {
+      agentId: 'candidate-a',
+      name: 'candidate_a',
+      description: 'Build and refine candidate A.',
+    },
+  ])
+
+  assert.deepEqual(agentToolCalls, [{
+    name: 'candidate_a',
+    description: 'Build and refine candidate A.',
+  }])
+  assert.equal(createdConfigs.length, 2)
+  const directorTools = createdConfigs[1]?.agent.tools
+  assert.ok(Array.isArray(directorTools))
+  assert.equal(directorCloseCalls.count, 0)
+  assert.equal(candidateCloseCalls.count, 0)
+
+  await service.closeAgent('director')
+  await service.closeAgent('candidate-a')
+  assert.equal(directorCloseCalls.count, 1)
+  assert.equal(candidateCloseCalls.count, 1)
+})
+
+test('specialist cannot close while a live composed runtime references it', async () => {
+  const candidateCloseCalls = { count: 0 }
+  const directorCloseCalls = { count: 0 }
+  const service = new StrandsBridgeRuntimeService(bootstrapReturning([
+    runtimeReturning('candidate', candidateCloseCalls),
+    runtimeReturning('director', directorCloseCalls),
+  ]))
+
+  await service.createAgent(config('candidate-a'))
+  await service.createAgent(config('director'), [{ agentId: 'candidate-a', name: 'candidate_a' }])
+
+  await assert.rejects(
+    service.closeAgent('candidate-a'),
+    /referenced by live runtime\(s\): director/,
+  )
+  assert.equal(candidateCloseCalls.count, 0)
+
+  await service.closeAgent('director')
+  await service.closeAgent('candidate-a')
+  assert.equal(directorCloseCalls.count, 1)
+  assert.equal(candidateCloseCalls.count, 1)
+})
+
+test('unknown self and duplicate agent-tool references fail before target runtime creation', async () => {
+  const candidateCloseCalls = { count: 0 }
+  const directorCloseCalls = { count: 0 }
+  const createdConfigs: StrandsAgentRuntimeConfig[] = []
+  const service = new StrandsBridgeRuntimeService(bootstrapReturning([
+    runtimeReturning('candidate', candidateCloseCalls),
+    runtimeReturning('director', directorCloseCalls),
+  ], createdConfigs))
+
+  await service.createAgent(config('candidate-a'))
+
+  await assert.rejects(
+    service.createAgent(config('director'), [{ agentId: 'missing', name: 'missing' }]),
+    /Unknown Strands agent runtime: missing/,
+  )
+  await assert.rejects(
+    service.createAgent(config('director'), [{ agentId: 'director', name: 'self' }]),
+    /cannot reference itself/,
+  )
+  await assert.rejects(
+    service.createAgent(config('director'), [
+      { agentId: 'candidate-a', name: 'candidate' },
+      { agentId: 'candidate-a', name: 'candidate' },
+    ]),
+    /Duplicate Strands agent tool name: candidate/,
+  )
+
+  assert.equal(createdConfigs.length, 1)
+  await service.closeAll()
+  assert.equal(candidateCloseCalls.count, 1)
+  assert.equal(directorCloseCalls.count, 0)
 })
