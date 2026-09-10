@@ -24,5 +24,5 @@ jobs:
       - name: Install exact dependencies
         run: npm ci --ignore-scripts
 
-      - name: Validate standalone bridge
-        run: npm run check
+      - name: Validate standalone bridge with real Strands MCP integration
+        run: npm run check:real
