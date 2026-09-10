@@ -41,7 +41,9 @@ interface CodexCliInvocation {
   readonly toolCalls: readonly CodexCliToolCall[]
 }
 
-const DEFAULT_TIMEOUT_MS = 240_000
+// Subscription-backed model calls have no wall-clock deadline by default.
+// Caller cancellation and the Strands turn/token budgets remain authoritative.
+const DEFAULT_TIMEOUT_MS = 0
 const DEFAULT_MAX_PROMPT_BYTES = 2_000_000
 const CODEX_OUTPUT_SCHEMA = JSON.stringify({
   $schema: 'http://json-schema.org/draft-07/schema#',
