@@ -25,6 +25,12 @@ const agentToolReferenceSchema = z.object({
   description: z.string().trim().min(1).optional(),
 }).strict()
 
+const invocationLimitsSchema = z.object({
+  turns: z.number().int().positive().optional(),
+  outputTokens: z.number().int().positive().optional(),
+  totalTokens: z.number().int().positive().optional(),
+}).strict()
+
 const invokeInputSchema = z.object({
   agentId: z.string().min(1),
   input: z.string(),
@@ -95,6 +101,29 @@ export function createStrandsBridgeMcpServer(
     async ({ agentId, input }) => {
       try {
         const output = await runtimeService.invokeAgent(agentId, input)
+        return {
+          content: [{ type: 'text', text: output.text }],
+          structuredContent: { ...output },
+        }
+      } catch (error) {
+        return errorResult(error)
+      }
+    },
+  )
+
+  server.registerTool(
+    'strands_agent_invoke_observed',
+    {
+      description: 'Invoke an existing Strands runtime while returning normalized native tool lifecycle evidence and the final result. Product-specific trust decisions remain Java-owned.',
+      inputSchema: z.object({
+        agentId: z.string().min(1),
+        input: z.string(),
+        limits: invocationLimitsSchema.optional(),
+      }),
+    },
+    async ({ agentId, input, limits }) => {
+      try {
+        const output = await runtimeService.invokeAgentObserved(agentId, input, limits)
         return {
           content: [{ type: 'text', text: output.text }],
           structuredContent: { ...output },
