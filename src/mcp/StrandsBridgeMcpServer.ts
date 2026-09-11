@@ -5,6 +5,7 @@ import type { StrandsAgentRuntimeConfig } from '../agent/config/StrandsAgentRunt
 import {
   StrandsBridgeRuntimeService,
   type StrandsAgentToolReference,
+  type StrandsBridgeInvocationLimits,
 } from './StrandsBridgeRuntimeService.js'
 
 const runtimeConfigSchema = z.object({
@@ -42,6 +43,17 @@ function runtimeConfig(value: unknown): StrandsAgentRuntimeConfig {
 
 function agentToolReferences(value: unknown): readonly StrandsAgentToolReference[] {
   return value as readonly StrandsAgentToolReference[]
+}
+
+function invocationLimits(
+  value: z.infer<typeof invocationLimitsSchema> | undefined,
+): StrandsBridgeInvocationLimits | undefined {
+  if (value === undefined) return undefined
+  return {
+    ...(value.turns === undefined ? {} : { turns: value.turns }),
+    ...(value.outputTokens === undefined ? {} : { outputTokens: value.outputTokens }),
+    ...(value.totalTokens === undefined ? {} : { totalTokens: value.totalTokens }),
+  }
 }
 
 function errorResult(error: unknown) {
@@ -123,7 +135,11 @@ export function createStrandsBridgeMcpServer(
     },
     async ({ agentId, input, limits }) => {
       try {
-        const output = await runtimeService.invokeAgentObserved(agentId, input, limits)
+        const output = await runtimeService.invokeAgentObserved(
+          agentId,
+          input,
+          invocationLimits(limits),
+        )
         return {
           content: [{ type: 'text', text: output.text }],
           structuredContent: { ...output },
