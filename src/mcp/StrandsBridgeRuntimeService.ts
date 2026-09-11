@@ -1,4 +1,4 @@
-import type { AgentAsToolOptions, AgentResult, Tool } from '@strands-agents/sdk'
+import type { AgentAsToolOptions, AgentResult, InvokeOptions, Tool } from '@strands-agents/sdk'
 
 import type { IStrandsAgentRuntimeBootstrap } from '../agent/bootstrap/IStrandsAgentRuntimeBootstrap.js'
 import { StrandsAgentRuntimeBootstrap } from '../agent/bootstrap/StrandsAgentRuntimeBootstrap.js'
@@ -8,6 +8,25 @@ import type { IStrandsAgentRuntime } from '../agent/runtime/IStrandsAgentRuntime
 export interface StrandsBridgeInvocationResult {
   readonly agentId: string
   readonly text: string
+}
+
+export interface StrandsBridgeObservedToolEvent {
+  readonly agentId: string
+  readonly toolName: string
+  readonly input?: unknown
+  readonly status?: string
+  readonly error?: string
+}
+
+export interface StrandsBridgeObservedInvocationResult extends StrandsBridgeInvocationResult {
+  readonly stopReason?: string
+  readonly toolEvents: readonly StrandsBridgeObservedToolEvent[]
+}
+
+export interface StrandsBridgeInvocationLimits {
+  readonly turns?: number
+  readonly outputTokens?: number
+  readonly totalTokens?: number
 }
 
 export interface StrandsAgentToolReference {
@@ -58,6 +77,32 @@ export class StrandsBridgeRuntimeService {
     return {
       agentId,
       text: result.toString(),
+    }
+  }
+
+  public async invokeAgentObserved(
+    agentId: string,
+    input: string,
+    limits?: StrandsBridgeInvocationLimits,
+  ): Promise<StrandsBridgeObservedInvocationResult> {
+    const safeAgentId = this.requireText(agentId, 'agentId')
+    const runtime = this.requireRuntime(safeAgentId)
+    const toolEvents: StrandsBridgeObservedToolEvent[] = []
+    const stream = runtime.streamAgent(input, this.invokeOptions(limits))
+
+    while (true) {
+      const next = await stream.next()
+      if (next.done) {
+        const result = next.value
+        const stopReason = this.stopReason(result)
+        return {
+          agentId: safeAgentId,
+          text: result.toString(),
+          ...(stopReason === undefined ? {} : { stopReason }),
+          toolEvents,
+        }
+      }
+      this.collectToolEvents(next.value, toolEvents)
     }
   }
 
@@ -122,6 +167,61 @@ export class StrandsBridgeRuntimeService {
         'One or more Strands runtimes failed to close.',
       )
     }
+  }
+
+  private invokeOptions(limits: StrandsBridgeInvocationLimits | undefined): InvokeOptions | undefined {
+    if (limits === undefined) return undefined
+    return {
+      limits: {
+        ...(limits.turns === undefined ? {} : { turns: limits.turns }),
+        ...(limits.outputTokens === undefined ? {} : { outputTokens: limits.outputTokens }),
+        ...(limits.totalTokens === undefined ? {} : { totalTokens: limits.totalTokens }),
+      },
+    }
+  }
+
+  private collectToolEvents(
+    value: unknown,
+    collected: StrandsBridgeObservedToolEvent[],
+  ): void {
+    if (!this.isRecord(value)) return
+    if (value['type'] === 'toolStreamUpdateEvent') {
+      const event = value['event']
+      if (this.isRecord(event)) {
+        this.collectToolEvents(event['data'], collected)
+      }
+      return
+    }
+    if (value['type'] !== 'afterToolCallEvent') return
+
+    const agent = value['agent']
+    const toolUse = value['toolUse']
+    if (!this.isRecord(agent) || !this.isRecord(toolUse)) return
+    const eventAgentId = agent['id']
+    const toolName = toolUse['name']
+    if (typeof eventAgentId !== 'string' || typeof toolName !== 'string') return
+
+    const result = value['result']
+    const status = this.isRecord(result) && typeof result['status'] === 'string'
+      ? result['status']
+      : undefined
+    const error = value['error']
+    collected.push({
+      agentId: eventAgentId,
+      toolName,
+      ...(toolUse['input'] === undefined ? {} : { input: toolUse['input'] }),
+      ...(status === undefined ? {} : { status }),
+      ...(error === undefined ? {} : { error: error instanceof Error ? error.message : String(error) }),
+    })
+  }
+
+  private stopReason(result: AgentResult): string | undefined {
+    const candidate = result as AgentResult & { readonly stopReason?: unknown }
+    return typeof candidate.stopReason === 'string' ? candidate.stopReason : undefined
+  }
+
+  private isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null
   }
 
   private resolveAgentTools(
