@@ -146,6 +146,6 @@ STRANDS_BRIDGE_MODEL_ID=global.anthropic.claude-sonnet-4-6 npm run test:integ:mo
 
 The model smoke intentionally fails when `STRANDS_BRIDGE_MODEL_ID` is absent. Provider credentials and region configuration remain environment-owned and are never committed.
 
-The package pins `@strands-agents/sdk` so all consuming agents share one validated SDK baseline. Dependency upgrades should be deliberate bridge changes with matching validation. `prepare` builds `dist` for Git-based npm consumers and `prepack` rebuilds `dist` before registry publication.
+The package pins `@strands-agents/sdk` so all consuming agents share one validated SDK baseline. Dependency upgrades should be deliberate bridge changes with matching validation. Git-based npm consumers use the checked-in `dist` runtime without a TypeScript build; `prepack` rebuilds `dist` before registry publication.
 
 See [`docs/strands-bridge/STRANDS_BRIDGE_FINAL_DRAFT.md`](docs/strands-bridge/STRANDS_BRIDGE_FINAL_DRAFT.md) for the current design contract.
