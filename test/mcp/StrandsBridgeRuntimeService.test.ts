@@ -45,6 +45,25 @@ function bootstrapReturning(
   }
 }
 
+function nativeTextRuntime(text: string): IStrandsAgentRuntime {
+  const result = {
+    lastMessage: {
+      content: [{type: 'textBlock', text}],
+    },
+    interrupts: [],
+    structuredOutput: undefined,
+    toString: () => {
+      throw new Error('AgentResult.toString must not be used for native MCP result extraction')
+    },
+  } as unknown as AgentResult
+  return {
+    invokeAgent: async () => result,
+    cancelInvocation: () => undefined,
+    createAgentTool: () => ({name: 'unused'}) as unknown as Tool,
+    close: async () => undefined,
+  } as unknown as IStrandsAgentRuntime
+}
+
 function config(id: string): StrandsAgentRuntimeConfig {
   return {
     agent: {
@@ -85,6 +104,16 @@ test('invokeOnce always closes the Strands runtime', async () => {
 
   assert.equal(result.text, 'one shot result')
   assert.equal(closeCalls.count, 1)
+})
+
+test('extracts native text blocks without invoking the noisy AgentResult formatter', async () => {
+  const service = new StrandsBridgeRuntimeService(bootstrapReturning([nativeTextRuntime('native MCP result')]))
+
+  await service.createAgent(config('native-result'))
+  const result = await service.invokeAgent('native-result', 'read the native result')
+
+  assert.equal(result.text, 'native MCP result')
+  await service.closeAll()
 })
 
 test('duplicate sessionful agent ids are rejected instead of replacing live runtimes', async () => {

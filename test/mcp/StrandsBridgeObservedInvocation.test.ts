@@ -39,7 +39,14 @@ function observedRuntime(): IStrandsAgentRuntime {
         error: new Error('provider failed'),
       } as never
       return {
-        toString: () => '{"ok":true}',
+        lastMessage: {
+          content: [{type: 'textBlock', text: '{"ok":true}'}],
+        },
+        interrupts: [],
+        structuredOutput: undefined,
+        toString: () => {
+          throw new Error('AgentResult.toString must not be used for observed MCP result extraction')
+        },
         stopReason: 'endTurn',
       } as unknown as AgentResult
     },
