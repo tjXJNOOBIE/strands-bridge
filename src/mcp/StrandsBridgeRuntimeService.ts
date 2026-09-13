@@ -1,5 +1,4 @@
 import type { AgentAsToolOptions, AgentResult, InvokeOptions, Tool } from '@strands-agents/sdk'
-
 import type { IStrandsAgentRuntimeBootstrap } from '../agent/bootstrap/IStrandsAgentRuntimeBootstrap.js'
 import { StrandsAgentRuntimeBootstrap } from '../agent/bootstrap/StrandsAgentRuntimeBootstrap.js'
 import type { StrandsAgentRuntimeConfig } from '../agent/config/StrandsAgentRuntimeConfig.js'
@@ -76,7 +75,7 @@ export class StrandsBridgeRuntimeService {
 
     return {
       agentId,
-      text: result.toString(),
+      text: this.resultText(result),
     }
   }
 
@@ -97,7 +96,7 @@ export class StrandsBridgeRuntimeService {
         const stopReason = this.stopReason(result)
         return {
           agentId: safeAgentId,
-          text: result.toString(),
+          text: this.resultText(result),
           ...(stopReason === undefined ? {} : { stopReason }),
           toolEvents,
         }
@@ -139,7 +138,7 @@ export class StrandsBridgeRuntimeService {
       const result = await runtime.invokeAgent(input)
       return {
         agentId,
-        text: result.toString(),
+        text: this.resultText(result),
       }
     } finally {
       await runtime.close()
@@ -218,6 +217,36 @@ export class StrandsBridgeRuntimeService {
   private stopReason(result: AgentResult): string | undefined {
     const candidate = result as AgentResult & { readonly stopReason?: unknown }
     return typeof candidate.stopReason === 'string' ? candidate.stopReason : undefined
+  }
+
+  private resultText(result: AgentResult): string {
+    if (result.interrupts !== undefined && result.interrupts.length > 0) {
+      return JSON.stringify(result.interrupts)
+    }
+    if (result.structuredOutput !== undefined) {
+      return JSON.stringify(result.structuredOutput)
+    }
+    if (result.lastMessage === undefined || result.lastMessage === null) {
+      return result.toString()
+    }
+    const blocks = result.lastMessage.content ?? []
+    const textParts: string[] = []
+    for (const block of blocks) {
+      if (!this.isRecord(block)) continue
+      const type = block['type']
+      if ((type === 'textBlock' || type === 'reasoningBlock') && typeof block['text'] === 'string') {
+        textParts.push(block['text'])
+        continue
+      }
+      if (type === 'citationsBlock' && Array.isArray(block['content'])) {
+        for (const citation of block['content']) {
+          if (this.isRecord(citation) && typeof citation['text'] === 'string') {
+            textParts.push(citation['text'])
+          }
+        }
+      }
+    }
+    return textParts.join('\n')
   }
 
   private isRecord(value: unknown): value is Record<string, unknown> {
@@ -315,4 +344,5 @@ export class StrandsBridgeRuntimeService {
 
     return safeValue
   }
+
 }
